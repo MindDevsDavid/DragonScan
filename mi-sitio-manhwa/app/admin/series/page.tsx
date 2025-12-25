@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/app/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, Edit, Trash2, Plus, Eye, BarChart3, Users, PauseCircle, Calendar, Search, Filter } from 'lucide-react'
+import { BookOpen, Edit, Trash2, Plus, Eye, CheckCircle, PlayCircle, PauseCircle } from 'lucide-react'
 
 interface Serie {
   id: number
@@ -76,14 +76,12 @@ export default function AdminSeriesPage() {
     }
   }
 
-  // Calcular estadísticas
+  // Calcular estadísticas por estado de serie
   const totalSeries = series.length
-  const totalChapters = series.reduce((acc, serie) => 
-    acc + (Array.isArray(serie.chapters) ? serie.chapters.length : 0), 0
-  )
   const seriesByStatus = {
-    ongoing: series.filter(s => s.status === 'ongoing').length,
-    hiatus: series.filter(s => s.status === 'hiatus').length,
+    completadas: series.filter(s => s.status === 'completed').length,
+    enCurso: series.filter(s => s.status === 'ongoing').length,
+    pausadas: series.filter(s => s.status === 'hiatus').length,
   }
 
   if (loading) {
@@ -142,43 +140,58 @@ export default function AdminSeriesPage() {
           </div>
         </div>
 
-        {/* Estadísticas de Admin */}
+        {/* Estadísticas de Admin - ACTUALIZADAS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-gray-800/50 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Total Series</p>
+                <p className="text-sm text-gray-400">Total de Series</p>
                 <p className="text-2xl font-bold">{totalSeries}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {totalSeries === 1 ? '1 serie' : `${totalSeries} series`}
+                </p>
               </div>
               <BookOpen className="h-8 w-8 text-blue-500" />
             </div>
           </div>
           
+          {/* CAMBIADO: Series Completadas */}
           <div className="bg-gray-800/50 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Capítulos</p>
-                <p className="text-2xl font-bold">{totalChapters}</p>
+                <p className="text-sm text-gray-400">Series Completadas</p>
+                <p className="text-2xl font-bold">{seriesByStatus.completadas}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {seriesByStatus.completadas === 1 ? '1 serie finalizada' : `${seriesByStatus.completadas} series finalizadas`}
+                </p>
               </div>
-              <Calendar className="h-8 w-8 text-green-500" />
+              <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
           </div>
           
+          {/* CAMBIADO: Series en Curso */}
           <div className="bg-gray-800/50 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">En Curso</p>
-                <p className="text-2xl font-bold">{seriesByStatus.ongoing}</p>
+                <p className="text-sm text-gray-400">Series en Curso</p>
+                <p className="text-2xl font-bold">{seriesByStatus.enCurso}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {seriesByStatus.enCurso === 1 ? '1 serie activa' : `${seriesByStatus.enCurso} series activas`}
+                </p>
               </div>
-              <Eye className="h-8 w-8 text-yellow-500" />
+              <PlayCircle className="h-8 w-8 text-yellow-500" />
             </div>
           </div>
           
+          {/* CAMBIADO: Series Pausadas */}
           <div className="bg-gray-800/50 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">En Pausa</p>
-                <p className="text-2xl font-bold">{seriesByStatus.hiatus}</p>
+                <p className="text-sm text-gray-400">Series Pausadas</p>
+                <p className="text-2xl font-bold">{seriesByStatus.pausadas}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {seriesByStatus.pausadas === 1 ? '1 serie en pausa' : `${seriesByStatus.pausadas} series en pausa`}
+                </p>
               </div>
               <PauseCircle className="h-8 w-8 text-gray-500" />
             </div>
@@ -206,10 +219,25 @@ export default function AdminSeriesPage() {
                 {series.map((serie) => {
                   const chapterCount = Array.isArray(serie.chapters) ? serie.chapters.length : 0
                   const statusBadge = {
-                    ongoing: 'bg-yellow-500/20 text-yellow-300',
-                    completed: 'bg-green-500/20 text-green-300',
-                    hiatus: 'bg-gray-500/20 text-gray-300',
+                    ongoing: {
+                      class: 'bg-yellow-500/20 text-yellow-300',
+                      icon: PlayCircle,
+                      label: 'En curso'
+                    },
+                    completed: {
+                      class: 'bg-green-500/20 text-green-300',
+                      icon: CheckCircle,
+                      label: 'Completada'
+                    },
+                    hiatus: {
+                      class: 'bg-gray-500/20 text-gray-300',
+                      icon: PauseCircle,
+                      label: 'En pausa'
+                    },
                   }
+                  
+                  const statusConfig = statusBadge[serie.status as keyof typeof statusBadge] || statusBadge.ongoing
+                  const StatusIcon = statusConfig.icon
 
                   return (
                     <tr key={serie.id} className="border-b border-gray-800 hover:bg-gray-800/30">
@@ -222,9 +250,9 @@ export default function AdminSeriesPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusBadge[serie.status as keyof typeof statusBadge]}`}>
-                          {serie.status === 'ongoing' ? 'En curso' :
-                           serie.status === 'completed' ? 'Completada' : 'En pausa'}
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusConfig.class}`}>
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {statusConfig.label}
                         </span>
                       </td>
                       <td className="p-4">
@@ -240,21 +268,21 @@ export default function AdminSeriesPage() {
                         <div className="flex gap-2">
                           <Link 
                             href={`/series/${serie.id}`} 
-                            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700"
+                            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition"
                             title="Ver pública"
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
                           <Link 
-                            href={`/admin/series/editar/${serie.id}`} 
-                            className="p-2 rounded-lg bg-blue-900/30 hover:bg-blue-900/50"
+                            href={`/admin/series/${serie.id}/editar`} 
+                            className="p-2 rounded-lg bg-blue-900/30 hover:bg-blue-900/50 transition"
                             title="Editar"
                           >
                             <Edit className="h-4 w-4" />
                           </Link>
                           <button
                             onClick={() => deleteSerie(serie.id)}
-                            className="p-2 rounded-lg bg-red-900/30 hover:bg-red-900/50"
+                            className="p-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 transition"
                             title="Eliminar"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -277,7 +305,7 @@ export default function AdminSeriesPage() {
               </p>
               <Link 
                 href="/admin/series/nueva" 
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-bold hover:bg-orange-600"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-bold hover:bg-orange-600 transition"
               >
                 <Plus className="h-5 w-5" />
                 Crear primera serie
@@ -288,10 +316,20 @@ export default function AdminSeriesPage() {
 
         {/* Nota informativa */}
         <div className="mt-8 rounded-lg bg-blue-900/20 p-4">
-          <p className="text-sm text-blue-300">
-            💡 Como administrador, puedes editar o eliminar cualquier serie. 
-            Los cambios se reflejarán inmediatamente en el sitio público.
-          </p>
+          <div className="flex items-center">
+            <div className="mr-3">
+              <span className="text-blue-400">💡</span>
+            </div>
+            <div>
+              <p className="text-sm text-blue-300">
+                Como administrador, puedes editar o eliminar cualquier serie. 
+                Los cambios se reflejarán inmediatamente en el sitio público.
+              </p>
+              <p className="text-sm text-blue-400/80 mt-1">
+                <strong>Resumen:</strong> {seriesByStatus.completadas} completadas • {seriesByStatus.enCurso} en curso • {seriesByStatus.pausadas} en pausa
+              </p>
+            </div>
+          </div>
         </div>
       </main>
     </div>

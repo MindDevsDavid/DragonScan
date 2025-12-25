@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/app/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -10,9 +10,21 @@ export default function NuevaSeriePage() {
   const [descripcion, setDescripcion] = useState('')
   const [estado, setEstado] = useState('ongoing')
   const [portadaFile, setPortadaFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+
+  // Generar vista previa de la imagen seleccionada
+  useEffect(() => {
+    if (portadaFile) {
+      const url = URL.createObjectURL(portadaFile)
+      setPreviewUrl(url)
+      return () => URL.revokeObjectURL(url)
+    } else {
+      setPreviewUrl(null)
+    }
+  }, [portadaFile])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,11 +32,33 @@ export default function NuevaSeriePage() {
     setError('')
 
     try {
-      // 1. Subir imagen de portada a Cloudflare R2
       let coverUrl = ''
+
+      // 1. Subir imagen de portada a Supabase Storage si existe
       if (portadaFile) {
-        // POR AHORA: Solo guardamos el nombre. En el PASO 3 subiremos realmente.
-        coverUrl = `portadas/${Date.now()}_${portadaFile.name}`
+        // Generar nombre único para el archivo
+        const fileExt = portadaFile.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
+        const filePath = `portadas/${fileName}`
+
+        // Subir archivo a Supabase Storage
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('series-covers') // Nombre del bucket en Supabase
+          .upload(filePath, portadaFile, {
+            cacheControl: '3600',
+            upsert: false
+          })
+
+        if (uploadError) {
+          throw new Error(`Error al subir la imagen: ${uploadError.message}`)
+        }
+
+        // Obtener URL pública de la imagen
+        const { data: publicUrlData } = supabase.storage
+          .from('series-covers')
+          .getPublicUrl(filePath)
+
+        coverUrl = publicUrlData.publicUrl
       }
 
       // 2. Guardar serie en Supabase
@@ -35,8 +69,8 @@ export default function NuevaSeriePage() {
             title: titulo,
             description: descripcion,
             status: estado,
-            cover_url: coverUrl, // Temporal
-            chapters: [] // Array vacío de capítulos
+            cover_url: coverUrl,
+            chapters: []
           }
         ])
         .select()
@@ -44,11 +78,11 @@ export default function NuevaSeriePage() {
 
       if (dbError) throw dbError
 
-      alert(`¡Serie "${titulo}" creada!`)
-      router.push('/admin') // Volver al panel
+      alert(`¡Serie "${titulo}" creada exitosamente!`)
+      router.push('/admin')
 
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || 'Error desconocido')
     } finally {
       setLoading(false)
     }
@@ -97,6 +131,18 @@ export default function NuevaSeriePage() {
               placeholder="Ej: El Reino de la Niebla"
             />
           </div>
+
+          {/* Vista previa de la portada seleccionada */}
+          {previewUrl && (
+            <div className="mt-4 mb-6 max-w-xs">
+              <div className="text-sm text-gray-500 mb-2">Vista previa de la portada:</div>
+              <img 
+                src={previewUrl} 
+                alt="Vista previa de la portada"
+                className="rounded-lg w-full h-auto max-h-64 object-cover border border-gray-700"
+              />
+            </div>
+          )}
 
           {/* Campo: Descripción */}
           <div>
@@ -155,7 +201,7 @@ export default function NuevaSeriePage() {
               )}
             </div>
             <p className="mt-2 text-sm text-gray-500">
-              Recomendado: 600×800 px. La subiremos en el siguiente paso.
+              Recomendado: 600×800 px. Formatos: JPG, PNG, WEBP.
             </p>
           </div>
 
@@ -176,14 +222,6 @@ export default function NuevaSeriePage() {
             </button>
           </div>
         </form>
-
-        {/* Nota sobre capítulos */}
-        <div className="mt-8 rounded-lg bg-blue-900/20 p-4 text-sm">
-          <p className="text-blue-300">
-            💡 Los capítulos se agregarán después desde la página de la serie.
-            Por ahora solo creamos la ficha básica.
-          </p>
-        </div>
       </div>
     </div>
   )

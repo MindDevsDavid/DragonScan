@@ -1,21 +1,33 @@
 import { supabase } from '@/app/lib/supabaseClient'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, Calendar, BarChart, ArrowLeft } from 'lucide-react'
+import Image from 'next/image'
+import { BookOpen, Calendar, BarChart, ArrowLeft, Eye, PlayCircle, CheckCircle, PauseCircle } from 'lucide-react'
 
-// Esta función se ejecuta en el servidor
-export default async function SeriePage({ params }: { params: { id: string } }) {
-  // Obtener la serie de la base de datos
+export default async function SeriePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  
   const { data: serie } = await supabase
     .from('series')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
-  // Si no existe, mostrar 404
   if (!serie) {
     notFound()
   }
+
+  const capitulos = Array.isArray(serie.chapters) ? serie.chapters : []
+  const totalCapitulos = capitulos.length
+
+  const estadoConfig = {
+    ongoing: { icon: PlayCircle, color: 'text-yellow-500', label: 'En curso' },
+    completed: { icon: CheckCircle, color: 'text-green-500', label: 'Completada' },
+    hiatus: { icon: PauseCircle, color: 'text-gray-500', label: 'En pausa' }
+  }
+  
+  const config = estadoConfig[serie.status as keyof typeof estadoConfig] || estadoConfig.ongoing
+  const EstadoIcono = config.icon
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -33,9 +45,14 @@ export default async function SeriePage({ params }: { params: { id: string } }) 
           <div className="mt-8 grid gap-8 md:grid-cols-3">
             {/* Portada */}
             <div className="md:col-span-1">
-              <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-gray-800">
+              <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-gray-800 relative">
                 {serie.cover_url ? (
-                  <div className="h-full w-full bg-gradient-to-br from-blue-900/30 to-purple-900/30" />
+                  // Usando img normal si no quieres optimización de Next.js
+                  <img 
+                    src={serie.cover_url} 
+                    alt={`Portada de ${serie.title}`}
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-full items-center justify-center">
                     <BookOpen className="h-20 w-20 text-gray-700" />
@@ -46,9 +63,11 @@ export default async function SeriePage({ params }: { params: { id: string } }) 
 
             {/* Información */}
             <div className="md:col-span-2">
-              <div className="mb-2 inline-flex items-center rounded-full bg-gray-800 px-4 py-1">
-                <span className="text-sm capitalize">{serie.status}</span>
+              <div className="mb-4 flex items-center">
+                <EstadoIcono className={`mr-2 h-5 w-5 ${config.color}`} />
+                <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
               </div>
+              
               <h1 className="text-4xl font-bold">{serie.title}</h1>
               
               <p className="mt-6 text-gray-300">{serie.description}</p>
@@ -65,8 +84,15 @@ export default async function SeriePage({ params }: { params: { id: string } }) 
                   <BarChart className="h-5 w-5 text-gray-500" />
                   <div>
                     <div className="text-gray-400">Capítulos</div>
-                    <div>{Array.isArray(serie.chapters) ? serie.chapters.length : 0}</div>
+                    <div>{totalCapitulos}</div>
                   </div>
+                </div>
+              </div>
+              
+              <div className="mt-6">
+                <div className="rounded-lg bg-gray-800/30 p-4 inline-block">
+                  <div className="text-2xl font-bold">{totalCapitulos}</div>
+                  <div className="text-sm text-gray-400">Capítulos totales</div>
                 </div>
               </div>
             </div>
@@ -78,30 +104,26 @@ export default async function SeriePage({ params }: { params: { id: string } }) 
       <div className="container mx-auto px-6 py-12">
         <h2 className="mb-8 text-2xl font-bold">Capítulos</h2>
         
-        {Array.isArray(serie.chapters) && serie.chapters.length > 0 ? (
+        {totalCapitulos > 0 ? (
           <div className="grid gap-4">
-            {serie.chapters.map((cap: any) => (
-              <div 
-                key={cap.number}
-                className="rounded-lg border border-gray-800 bg-gray-900/50 p-6 hover:border-gray-700"
+            {capitulos.map((cap: any, index: number) => (
+              <Link 
+                href={`/leer/${serie.id}/${index + 1}`} 
+                key={index}
+                className="flex items-center justify-between p-6 rounded-lg border border-gray-800 bg-gray-900/50 hover:border-accent hover:bg-gray-800/30 transition group"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold">
-                      Capítulo {cap.number}: {cap.title}
-                    </h3>
-                    <p className="mt-1 text-gray-400">
-                      {cap.pages?.length || 0} páginas • Publicado el {new Date(cap.uploaded_at).toLocaleDateString('es')}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/leer/${serie.id}/${cap.number}`}
-                    className="rounded-lg bg-accent px-6 py-2 font-bold hover:bg-orange-600"
-                  >
-                    Leer
-                  </Link>
+                <div>
+                  <h3 className="text-xl font-bold group-hover:text-accent transition">
+                    Capítulo {index + 1}: {cap.titulo || `Capítulo ${index + 1}`}
+                  </h3>
+                  <p className="mt-1 text-gray-400">
+                    Publicado el {cap.fecha_subida ? new Date(cap.fecha_subida).toLocaleDateString('es') : 'Fecha desconocida'}
+                  </p>
                 </div>
-              </div>
+                <div className="flex items-center">
+                  <Eye className="h-5 w-5 text-gray-600 group-hover:text-accent transition" />
+                </div>
+              </Link>
             ))}
           </div>
         ) : (
