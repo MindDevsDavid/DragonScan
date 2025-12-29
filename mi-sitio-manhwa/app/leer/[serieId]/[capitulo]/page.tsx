@@ -37,7 +37,7 @@ export default async function LeerCapituloPage({
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link 
-              href={`/serie/${serieId}`}
+              href={`/series/${serieId}`}
               className="inline-flex items-center text-gray-300 hover:text-white"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -109,7 +109,7 @@ export default async function LeerCapituloPage({
           )}
           
           <Link
-            href={`/serie/${serieId}`}
+            href={`/series/${serieId}`}
             className="inline-flex items-center px-6 py-3 rounded-lg bg-gray-700 hover:bg-gray-600"
           >
             <Home className="mr-2 h-4 w-4" />

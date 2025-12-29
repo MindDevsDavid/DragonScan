@@ -161,7 +161,7 @@ export default function NuevoCapituloPage() {
       if (updateError) throw updateError
 
       alert(`¡Capítulo ${numeroCapitulo} subido exitosamente!`)
-      router.push(`/serie/${serieId}`)
+      router.push(`/series/${serieId}`)
 
     } catch (err: any) {
       setError(err.message || 'Error al subir el capítulo')
